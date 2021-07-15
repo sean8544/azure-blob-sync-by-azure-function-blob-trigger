@@ -57,8 +57,16 @@ namespace Company.Function
             // to prevent another client from modifying it.
             BlobLeaseClient lease = sourceBlob.GetBlobLeaseClient();
 
-            // Specifying -1 for the lease interval creates an infinite lease.
-            await lease.AcquireAsync(TimeSpan.FromSeconds(-1));
+
+            try{
+                // Specifying -1 for the lease interval creates an infinite lease.
+                await lease.AcquireAsync(TimeSpan.FromSeconds(-1));
+            }
+            catch(Exception ex)
+            {
+                log.LogError($"Set lease error:{ex.Message}");
+            }
+            
 
             // Get the source blob's properties and display the lease state.
             BlobProperties sourceProperties = await sourceBlob.GetPropertiesAsync();
@@ -68,8 +76,14 @@ namespace Company.Function
             var sourceSas = sourceBlob.GenerateSasUri(Azure.Storage.Sas.BlobSasPermissions.Read, DateTime.UtcNow.AddMinutes(-10).AddDays(7));
 
            
-            // Start the copy operation.
-            await destBlob.StartCopyFromUriAsync(sourceSas);
+            //StartCopyFromUriAsync 只用在从云端storage 拷贝到 云端 storage的情况，如果从云端 拷贝到 iot edge，则可以使用 先download 后upload的方式
+            // Start the copy operation. This works only when copy cloud to cloud
+            //await destBlob.StartCopyFromUriAsync(sourceSas);
+
+            //uncommon bellow code if you want to sync from cloud to IoT Edge
+            
+            await sourceBlob.DownloadToAsync(sourceBlob.Name);
+            await destBlob.UploadAsync(sourceBlob.Name);
 
             // Get the destination blob's properties and display the copy status.
             BlobProperties destProperties = await destBlob.GetPropertiesAsync();
